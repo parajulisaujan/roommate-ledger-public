@@ -1,0 +1,88 @@
+name: Verify ledger
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Fresh containers, Alembic, smoke and restart persistence
+        run: node frontend/scripts/docker-smoke.mjs
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_DB: ledger_pytest_ci
+          POSTGRES_USER: ledger_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ledger_test -d ledger_pytest_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://localhost:5432/ledger_pytest_ci
+      DATABASE_USER: ledger_test
+      DATABASE_PASSWORD: ci-only-password
+      TEST_DATABASE_URL: postgresql+psycopg://localhost:5432/ledger_pytest_ci
+      TEST_DATABASE_USER: ledger_test
+      TEST_DATABASE_PASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.12.10'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked Python dependencies
+        working-directory: backend
+        run: uv sync --frozen --extra dev
+      - name: Build and install Python release package
+        working-directory: backend
+        run: |
+          uv build --out-dir dist
+          uv venv /tmp/ledger-package-check
+          uv pip install --python /tmp/ledger-package-check/bin/python dist/*.whl
+          cd /tmp
+          /tmp/ledger-package-check/bin/python -c "from app.main import app; assert '/health' in app.openapi()['paths']"
+      - name: Python lint, PostgreSQL integration and migration verification
+        working-directory: backend
+        run: |
+          uv run ruff check app tests alembic scripts
+          uv run ruff format --check app tests alembic scripts
+          uv run pytest -q
+          uv run alembic upgrade head
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint && npm run typecheck && npm run test && npm run build
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start FastAPI and local test mailbox
+        env:
+          SMTP_HOST: 127.0.0.1
+          SMTP_PORT: '2525'
+          SMTP_STARTTLS: 'false'
+          EMAIL_FROM: ledger@example.test
+          EMAIL_VERIFICATION_REQUIRED: 'true'
+          FRONTEND_URL: http://127.0.0.1:3000
+        run: |
+          node frontend/scripts/test-mailbox.mjs > mailbox.log 2>&1 &
+          cd backend
+          .venv/bin/python -m app.serve > ../backend.log 2>&1 &
+      - run: npm run test:e2e
+        working-directory: frontend
+        env:
+          TEST_MAILBOX_URL: http://127.0.0.1:8025

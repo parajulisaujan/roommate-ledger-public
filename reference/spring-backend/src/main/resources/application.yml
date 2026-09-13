@@ -1,0 +1,85 @@
+spring:
+  profiles:
+    default: development
+  jackson:
+    deserialization:
+      accept-float-as-int: false
+      fail-on-null-for-primitives: true
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/roommateledger}
+    username: ${DATABASE_USER:roommateledger}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 5000
+  flyway:
+    clean-disabled: true
+    validate-on-migrate: true
+    baseline-on-migrate: false
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 9MB
+server:
+  port: ${PORT:8080}
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        http-only: true
+        secure: ${COOKIE_SECURE:false}
+        same-site: ${COOKIE_SAME_SITE:lax}
+  error:
+    include-message: never
+    include-stacktrace: never
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  email:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    from: ${EMAIL_FROM:}
+    starttls: ${SMTP_STARTTLS:true}
+    verification-required: ${EMAIL_VERIFICATION_REQUIRED:false}
+  rate:
+    window-seconds: ${RATE_WINDOW_SECONDS:900}
+    login: ${RATE_LOGIN:20}
+    registration: ${RATE_REGISTRATION:20}
+    forgot: ${RATE_FORGOT:5}
+    reset: ${RATE_RESET:10}
+    verification: ${RATE_VERIFICATION:5}
+    invitations: ${RATE_INVITATIONS:10}
+    extraction: ${RATE_EXTRACTION:10}
+    account: ${RATE_ACCOUNT:5}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  receipt:
+    provider: ${RECEIPT_PROVIDER:adapter}
+    openai-key: ${OPENAI_API_KEY:}
+    openai-model: ${OPENAI_RECEIPT_MODEL:}
+    endpoint: ${RECEIPT_PROVIDER_URL:}
+    api-key: ${RECEIPT_PROVIDER_API_KEY:}
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:}
+  level:
+    root: INFO
+    org.springframework.jdbc: INFO
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState

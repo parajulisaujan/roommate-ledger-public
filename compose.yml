@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: roommateledger
+      POSTGRES_USER: ${DATABASE_USER:-roommateledger}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ledger-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d roommateledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  api:
+    build: ./backend
+    profiles: [app]
+    environment:
+      DATABASE_URL: postgresql+psycopg://db:5432/roommateledger
+      DATABASE_USER: ${DATABASE_USER:-roommateledger}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      APP_ENV: ${APP_ENV:-development}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
+      SESSION_TIMEOUT_SECONDS: ${SESSION_TIMEOUT_SECONDS:-1800}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-5}
+      RECEIPT_TIMEOUT_SECONDS: ${RECEIPT_TIMEOUT_SECONDS:-45}
+      RATE_WINDOW_SECONDS: ${RATE_WINDOW_SECONDS:-900}
+      RATE_LOGIN: ${RATE_LOGIN:-20}
+      RATE_REGISTRATION: ${RATE_REGISTRATION:-20}
+      RATE_PASSWORD_RESET: ${RATE_PASSWORD_RESET:-5}
+      RATE_RESET_CONFIRM: ${RATE_RESET_CONFIRM:-10}
+      RATE_VERIFICATION: ${RATE_VERIFICATION:-5}
+      RATE_INVITATIONS: ${RATE_INVITATIONS:-10}
+      RATE_EXTRACTION: ${RATE_EXTRACTION:-10}
+      RATE_ACCOUNT: ${RATE_ACCOUNT:-5}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      EMAIL_VERIFICATION_REQUIRED: ${EMAIL_VERIFICATION_REQUIRED:-false}
+      RECEIPT_PROVIDER: ${RECEIPT_PROVIDER:-adapter}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_RECEIPT_MODEL: ${OPENAI_RECEIPT_MODEL:-}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      RECEIPT_PROVIDER_URL: ${RECEIPT_PROVIDER_URL:-}
+      RECEIPT_PROVIDER_API_KEY: ${RECEIPT_PROVIDER_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/actuator/health/readiness', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 12
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://api:8080
+        APP_ENV: ${APP_ENV:-development}
+        FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    profiles: [app]
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  ledger-data:

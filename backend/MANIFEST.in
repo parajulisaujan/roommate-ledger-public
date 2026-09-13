@@ -1,0 +1,4 @@
+include README.md alembic.ini uv.lock Dockerfile
+recursive-include alembic *.py *.sql
+recursive-include tests *.py *.png *.jpeg *.webp
+recursive-include scripts *.py

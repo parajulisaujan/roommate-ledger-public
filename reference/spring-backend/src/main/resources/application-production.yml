@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        secure: true
+app:
+  frontend-url: ${FRONTEND_URL}
+  email:
+    verification-required: true
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:ecs}

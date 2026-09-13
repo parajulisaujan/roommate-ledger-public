@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${TEST_DATABASE_URL:jdbc:h2:mem:ledger;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${TEST_DATABASE_USER:sa}
+    password: ${TEST_DATABASE_PASSWORD:}
+app:
+  receipt:
+    endpoint: ""
+    api-key: ""
